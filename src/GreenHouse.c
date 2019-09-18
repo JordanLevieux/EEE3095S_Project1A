@@ -1,12 +1,37 @@
 #include <GreenHouse.h>
 
 int RTC;
+int HH,MM,SS;
+int interval = 1000;//1s default
+long lastInterruptTime = 0;//for btn debounce
+int alarm = 0;//default false
+int monitoring = 1;//default true
+int sysHour, sysMin, sysSec;
 
 int main()
 {
 	initGPIO();
 	syncTime();
+	resetSysTime();
+	
+	//black magic from Keegan to set up thread
+	pthread_attr_t tattr;
+    pthread_t thread_id;
+    int newprio = 99;
+    sched_param param;
+    pthread_attr_init (&tattr);
+    pthread_attr_getschedparam (&tattr, &param);
+    param.sched_priority = newprio;
+    pthread_attr_setschedparam (&tattr, &param);
+    pthread_create(&thread_id, &tattr, adcThread, (void *)1);
+    
+    
 	return 0;
+}
+
+void *adcThread(void *threadargs)//ToDo initialise
+{
+	//code to read from adc
 }
 
 void initGPIO()
@@ -28,12 +53,13 @@ void initGPIO()
 	}
 	
 	//setup interupts
-	wiringPiISR (BTNS[0], INT_EDGE_FALLING, iChange);
-	wiringPiISR (BTNS[1], INT_EDGE_FALLING, resetSTime);
+	wiringPiISR (BTNS[0], INT_EDGE_FALLING, intervalChange);
+	wiringPiISR (BTNS[1], INT_EDGE_FALLING, resetSysTime);
 	wiringPiISR (BTNS[2], INT_EDGE_FALLING, dismissAlarm);
 	wiringPiISR (BTNS[3], INT_EDGE_FALLING, toggleMonitoring);
 	
-	
+	//setup SPI
+	wiringPiSPISetup(SPI_CHAN, SPI_SPEED);
 	
 }
 
@@ -73,4 +99,59 @@ int hexCompensation(int units)
 	else if (units >= 0x20){units = 20 + unitsU;}
 	else if (units >= 0x10){units = 10 + unitsU;}
 	return units;
+}
+
+void intervalChange()//change update interval between 1s, 2s &5s
+{
+	long interruptTime = millis();
+
+	if (interruptTime - lastInterruptTime>debounceTime)
+	{
+		switch(interval)
+		{
+			case 1000: interval = 2000;
+			break;
+			case 2000: interval = 5000;
+			break:
+			default: interval = 1000;
+		}
+	}
+	lastInterruptTime = interruptTime;
+}
+
+void resetSysTime()
+{
+	long interruptTime = millis();
+	if (interruptTime - lastInterruptTime>debounceTime)
+	{
+		sysHour = 0;
+		sysMin = 0;
+		sysSec = 0;
+	}
+	lastInterruptTime = interruptTime;
+}
+
+void updateSysTime()
+{
+	//ToDo
+}
+
+void dismissAlarm()
+{
+	long interruptTime = millis();
+	if (interruptTime - lastInterruptTime>debounceTime)
+	{
+		alarm = 0;
+	}
+	lastInterruptTime = interruptTime;
+}
+
+toggleMonitoring()
+{
+	long interruptTime = millis();
+	if (interruptTime - lastInterruptTime>debounceTime)
+	{
+		monitoring = ~monitoring;
+	}
+	lastInterruptTime = interruptTime;
 }
