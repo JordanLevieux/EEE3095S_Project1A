@@ -1,17 +1,17 @@
 #include <GreenHouse.h>
 
 int RTC;
-int HH,MM,SS;
 int interval = 1000;//1s default
 long lastInterruptTime = 0;//for btn debounce
 int alarm = 0;//default false
 int monitoring = 1;//default true
 int sysHour, sysMin, sysSec;
+int rtcHour, rtcMin, rtcSec;
 
 int main()
 {
 	initGPIO();
-	syncTime();
+	
 	resetSysTime();
 	
 	//black magic from Keegan to set up thread
@@ -40,7 +40,23 @@ void initGPIO()
 	wiringPiSetup();
 	
 	//setup RTC
+	int rtcSetup;
 	RTC = wiringPiI2CSetup(RTCAddr);
+	syncTime();
+		//setup alarm on RTC for timing
+		pinMode(RTCAlarm, INPUT);
+		pullUpDnControl(RTCAlarm, PUD_UP);
+		
+		rtcSetup = ReadReg8(RTC, 0x0D);
+		rtcSetup &= 0b10000111;
+		rtcSetup |= 0b10000000;
+		wiringPiI2CWriteReg8(RTC, 0x0D, rtcSetup);
+		wiringPiI2CWriteReg8(RTC, 0x0A, 0bxxxxxx1);//no idea if this will work
+		rtcSetup = ReadReg8(RTC, 0x07);
+		rtcSetup |= 0b00010000;
+		rtcSetup &= 0b10111111;
+		wiringPiI2CWriteReg8(RTC, 0x07, rtcSetup);
+		//This will probably have a lot of issues
 	
 	//setup PWW for alarm
 	pinMode(PWMpin, PWM_OUTPUT);
@@ -57,6 +73,7 @@ void initGPIO()
 	wiringPiISR (BTNS[1], INT_EDGE_FALLING, resetSysTime);
 	wiringPiISR (BTNS[2], INT_EDGE_FALLING, dismissAlarm);
 	wiringPiISR (BTNS[3], INT_EDGE_FALLING, toggleMonitoring);
+	wiringPiISR (RTCAlarm, INT_EDGE_FALLING, //TODO);
 	
 	//setup SPI
 	wiringPiSPISetup(SPI_CHAN, SPI_SPEED);
@@ -65,6 +82,7 @@ void initGPIO()
 
 void syncTime()//sync the RTC with internet time
 {
+	int HH,MM,SS;
 	HH = getHours();
 	MM = getMins();
 	SS = getSecs();

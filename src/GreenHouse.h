@@ -24,4 +24,5 @@ const int debounceTime = 200;
 //Pins
 const int BTNS[] = {,,,};
 const int PWMpin = 1;
+const int RTCAlarm =;//TODO
 
