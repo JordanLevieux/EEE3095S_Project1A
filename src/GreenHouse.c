@@ -10,7 +10,7 @@ int monitoring = 1;					//default true
 int sysHour, sysMin, sysSec;		//Time holding variables
 int rtcHour, rtcMin, rtcSec;
 
-double humidity = 0;
+float humidity = 0;
 int temp=0;
 int light=0;
 
@@ -25,7 +25,7 @@ int main()
     while (1)
     {
     	delay(1000);
-    	printf("%f\t%d\t%d\n",humidity, temp, light);
+    	//printf("%.1f\t%d\t%d\n", humidity, temp, light);
     }
     
 	return 0;
@@ -36,7 +36,7 @@ void setupThread()
 	//black magic from Keegan to set up thread
 	pthread_attr_t tattr;
     pthread_t thread_id;
-    int newprio = 99;
+    int newprio = 80;
     sched_param param;
     
     pthread_attr_init (&tattr);
@@ -53,10 +53,11 @@ void *adcThread(void *threadargs)
 	while (1)
 	{
 		buffer[0] = 1;
-		buffer[1] = 0b10000000;								//read from chan0 & modify humidity's variable
+		buffer[1] = 0b10110000;								//read from chan0 & modify humidity's variable
 		wiringPiSPIDataRW(SPI_CHAN, buffer, 3);
-		humidity = (((buffer[1]&3)<<8)+buffer[2])/2023*3.3;
-		
+  		humidity = (((buffer[1]&3)<<8)+buffer[2]);
+		humidity = (humidity/1023)*3.3;
+
 		buffer[0] = 1;
 		buffer[1] = 0b10010000;								//read from chan1 & modify humidity's variable
 		wiringPiSPIDataRW(SPI_CHAN, buffer, 3);
@@ -162,7 +163,9 @@ int hexCompensation(int units)
 }
 
 void intervalChange()//change update interval between 1s, 2s &5s
-{/*
+{
+	printf("interupt1\n");
+/*
 	long interruptTime = millis();
 
 	if (interruptTime - lastInterruptTime>debounceTime)
@@ -187,6 +190,7 @@ void resetSysTime()
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
+		printf("interupt 2\n");
 		sysHour = 0;
 		sysMin = 0;
 		sysSec = 0;
@@ -196,17 +200,17 @@ void resetSysTime()
 
 void updateSysTime()
 {
-	//ToDo
+	
 }
 
 void dismissAlarm()
 {
-	/*long interruptTime = millis();
+	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
-		alarm = 0;
+		printf("interupt 3\n");
 	}
-	lastInterruptTime = interruptTime;*/
+	lastInterruptTime = interruptTime;
 }
 
 void toggleMonitoring()
@@ -214,6 +218,7 @@ void toggleMonitoring()
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
+		printf("interupt 4\n");
 		monitoring = ~monitoring;
 	}
 	lastInterruptTime = interruptTime;

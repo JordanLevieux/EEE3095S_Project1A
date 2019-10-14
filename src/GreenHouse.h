@@ -28,7 +28,7 @@ const char RTCAddr = 0x6f;
 const char SEC = 0x00;
 const char MIN = 0x01;
 const char HOUR = 0x02;
-const int debounceTime = 200;
+const int debounceTime = 300;
 #define SPI_CHAN 0
 #define SPI_SPEED 409600
 //Pins
