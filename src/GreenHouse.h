@@ -22,6 +22,7 @@ void toggleMonitoring();
 void setupThread();
 void *adcThread(void *threadargs);
 void outputValues();
+void triggerAlarm();
 
 //Constants
 const char RTCAddr = 0x6f;

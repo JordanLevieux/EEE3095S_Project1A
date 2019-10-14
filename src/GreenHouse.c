@@ -4,8 +4,9 @@ int RTC;
 int interval = 1;
 int counter =0;
 
+long alarmInterruptTime = 0;		//for alarm debounce
 long lastInterruptTime = 0;			//for btn debounce
-//int alarm = 0;						//default false
+int dacAlarm = 1;						//default false
 int monitoring = 1;					//default true
 
 int sysHour, sysMin, sysSec;		//Time holding variables
@@ -15,7 +16,7 @@ int sHour, sMin, sSec;
 float humidity = 0;
 int temp=0;
 int light=0;
-
+float dacOut =0;
 int main()
 {
 	initGPIO();
@@ -24,7 +25,7 @@ int main()
 	
 	setupThread();
     
-	printf("RTC Time\tHumidity Temp\tLight\n");
+	printf("RTC Time\tSys Time\tHumidity Temp\tLight\tDAC out\n");
     while (1)
     {
 		if(monitoring)
@@ -74,6 +75,9 @@ void *adcThread(void *threadargs)
 		buffer[1] = 0b10100000;								//read from chan1 & modify humidity's variable
 		wiringPiSPIDataRW(SPI_CHAN, buffer, 3);
 		light = (((buffer[1]&3)<<8)+buffer[2]);
+
+		dacOut = (light/1023.0)*humidity;
+		
 	}
 	
 }
@@ -190,6 +194,7 @@ void dismissAlarm()
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
+		dacAlarm = 0;
 		printf("Dismiss Alarm:\n");
 	}
 	lastInterruptTime = interruptTime;
@@ -207,6 +212,11 @@ void toggleMonitoring()
 	lastInterruptTime = interruptTime;
 }
 
+void triggerAlarm()
+{
+	long interruptTime = millis();
+	if (interruptTime-alarmInterruptTime > 180000){dacAlarm = 1;}
+}
 
 void outputValues()
 {
@@ -221,7 +231,9 @@ void outputValues()
 			rtcSec = wiringPiI2CReadReg8(RTC, SEC);
 			rtcSec &= 0b01111111;
 			getSysTime(rtcHour,rtcMin,rtcSec);
-			printf("%02x:%02x:%02x\t%02d:%02d:%02d\t%.1f\t%d\t%d\n",rtcHour,rtcMin,rtcSec,sHour,sMin,sSec,humidity, temp, light);
+			if(dacOut<0.65||dacOut>2.65){triggerAlarm();}
+			printf("%02x:%02x:%02x\t%02d:%02d:%02d\t%.1f\t%d\t%d\t%.1f\t%d\n",rtcHour,rtcMin,rtcSec,sHour,sMin,sSec,humidity, temp, light,dacOut,dacAlarm);
 		}
 	}
 }
+
