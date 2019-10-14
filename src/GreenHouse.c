@@ -1,7 +1,8 @@
 #include "GreenHouse.h"
 
 int RTC;
-//unsigned char interval = 0b0000001;	//1s default output interval
+int interval = 1;
+int counter =0;
 
 long lastInterruptTime = 0;			//for btn debounce
 //int alarm = 0;						//default false
@@ -22,10 +23,15 @@ int main()
 	
 	setupThread();
     
+	printf("Humidity Temp\tLight\n");
     while (1)
     {
-    	delay(1000);
-    	//printf("%.1f\t%d\t%d\n", humidity, temp, light);
+		if(monitoring)
+		{
+    		delay(interval*1000);
+			//outputValues();
+		}
+		
     }
     
 	return 0;
@@ -78,30 +84,19 @@ void initGPIO()
 	
 	//setup SPI
 	wiringPiSPISetup(SPI_CHAN, SPI_SPEED);
-	//comented out for the moment
-	/*
-	//Setup RTC
-	int rtcSetup;
-	RTC = wiringPiI2CSetup(RTCAddr);
 	
-	syncTime();
-		//Setup alarm on RTC for timing
-		pinMode(RTCAlarm, INPUT);
-		pullUpDnControl(RTCAlarm, PUD_UP);
-		
-		//Activate Alarm 0 on the RTC
-		rtcSetup = wiringPiI2CReadReg8(RTC, 0x0D);
-		rtcSetup &= 0b00000111;						//TODO check that MFP supposed to go low
-		//rtcSetup |= 0b10000000;
-		wiringPiI2CWriteReg8(RTC, 0x0D, rtcSetup);
-		
-		//Set RTC to use Alarm with MFP
-		wiringPiI2CWriteReg8(RTC, 0x0A, interval);
-		rtcSetup = wiringPiI2CReadReg8(RTC, 0x07);
-		rtcSetup |= 0b00010000;
-		rtcSetup &= 0b10011111;
-		wiringPiI2CWriteReg8(RTC, 0x07, rtcSetup);
-	*/
+	//setup RTC
+	RTC = wiringPiI2CSetup(RTCAddr);
+	wiringPiI2CWriteReg8(RTC, HOUR, 0x13);
+    wiringPiI2CWriteReg8(RTC, MIN, 0x54);
+    wiringPiI2CWriteReg8(RTC, SEC, 0x00);
+    wiringPiI2CWriteReg8(RTC, SEC, 0b10000000);
+	int setup = wiringPiI2CReadReg8(RTC, 0x07);
+	setup = wiringPiI2CReadReg8(RTC, 0x07);
+	setup |= 0b01000000;
+	setup &= 0b11000000;
+	wiringPiI2CWriteReg8(RTC, 0x07, setup);
+
 	//setup PWW for alarm
 	pinMode(PWMpin, PWM_OUTPUT);
 	
@@ -164,25 +159,24 @@ int hexCompensation(int units)
 
 void intervalChange()//change update interval between 1s, 2s &5s
 {
-	printf("interupt1\n");
-/*
+	printf("Change Interval:\n");
+
 	long interruptTime = millis();
 
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
 		switch(interval)
 		{
-			case 1: interval = 0b0000010;
-				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
+			case 1: interval = 1;
+				interval = 2;
 				break;
-			case 2: interval = 0b0000101;
-				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
-				break
-			default: interval = 0b0000001;
-				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
+			case 2: interval = 2;
+				interval = 5;
+				break;
+			default: interval = 1;
 		}
 	}
-	lastInterruptTime = interruptTime;*/
+	lastInterruptTime = interruptTime;
 }
 
 void resetSysTime()
@@ -190,7 +184,7 @@ void resetSysTime()
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
-		printf("interupt 2\n");
+		printf("Reset System Time:\n");
 		sysHour = 0;
 		sysMin = 0;
 		sysSec = 0;
@@ -200,7 +194,7 @@ void resetSysTime()
 
 void updateSysTime()
 {
-	
+	//
 }
 
 void dismissAlarm()
@@ -208,7 +202,7 @@ void dismissAlarm()
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
-		printf("interupt 3\n");
+		printf("Dismiss Alarm:\n");
 	}
 	lastInterruptTime = interruptTime;
 }
@@ -218,8 +212,9 @@ void toggleMonitoring()
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
-		printf("interupt 4\n");
-		monitoring = ~monitoring;
+		printf("Toggle Monitoring:\n");
+		if (monitoring ==1){monitoring =0;}
+		else {monitoring = 1;}
 	}
 	lastInterruptTime = interruptTime;
 }
@@ -227,18 +222,15 @@ void toggleMonitoring()
 
 void outputValues()
 {
-	//Reset alarm flag
-	int reset = wiringPiI2CReadReg8(RTC, 0x0D);	
-	reset &= 0b11110111;					
-	wiringPiI2CWriteReg8(RTC, 0x0D, reset);
-	
-	//Set alarm to trigger after next interval
-	
-	
-	rtcHour = wiringPiI2CReadReg8(RTC, HOUR);
-	rtcMin = wiringPiI2CReadReg8(RTC, MIN);
-	rtcSec = wiringPiI2CReadReg8(RTC, SEC);
-	rtcSec &= 0b01111111;
-	
-	
+	printf("Hakuna\n");
+	if(monitoring)
+	{
+		printf("MaTata");
+		if(counter<interval){counter++;}
+		else
+		{
+			counter = 0;
+			printf("%.1f\t%d\t%d\n",humidity, temp, light);
+		}
+	}
 }
