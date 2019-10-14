@@ -14,6 +14,7 @@ void resetSysTime();
 void updateSysTime();
 void dismissAlarm();
 void toggleMonitoring();
+void setupThread();
 
 //Constants
 const char RTCAddr = 0x6f;

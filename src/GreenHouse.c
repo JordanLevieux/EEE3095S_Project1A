@@ -1,12 +1,18 @@
 #include <GreenHouse.h>
 
 int RTC;
-int interval = 1000;//1s default
-long lastInterruptTime = 0;//for btn debounce
-int alarm = 0;//default false
-int monitoring = 1;//default true
-int sysHour, sysMin, sysSec;
+unsigned char interval = 0b0000001;	//1s default output interval
+
+long lastInterruptTime = 0;			//for btn debounce
+int alarm = 0;						//default false
+int monitoring = 1;					//default true
+
+int sysHour, sysMin, sysSec;		//Time holding variables
 int rtcHour, rtcMin, rtcSec;
+
+double humidity = 0;
+int temp=0;
+int light=0;
 
 int main()
 {
@@ -14,24 +20,53 @@ int main()
 	
 	resetSysTime();
 	
+	setupThread();
+    
+    while (1)
+    {
+    	delay(1000);
+    	printf("%f\t%d\t%d\n",humidity, temp, light);
+    }
+    
+	return 0;
+}
+
+void setupThread()
+{
 	//black magic from Keegan to set up thread
 	pthread_attr_t tattr;
     pthread_t thread_id;
-    int newprio = 99;
+    int newprio = 80;
     sched_param param;
     pthread_attr_init (&tattr);
     pthread_attr_getschedparam (&tattr, &param);
     param.sched_priority = newprio;
     pthread_attr_setschedparam (&tattr, &param);
     pthread_create(&thread_id, &tattr, adcThread, (void *)1);
-    
-    
-	return 0;
 }
 
-void *adcThread(void *threadargs)//ToDo initialise
+void *adcThread(void *threadargs)
 {
-	//code to read from adc
+	unsigned char buffer[3];					//Declare buffer array to RW to the ADC
+	
+	while (1)
+	{
+		buffer[0] = 1;
+		buffer[1] = 0b10000000;								//read from chan0 & modify humidity's variable
+		wiringPiSPIDataRW(SPI_CHAN, buffer, 3);
+		humidity = (((buffer[1]&3)<<8)+buffer[2])/2023*3.3;
+		
+		buffer[0] = 1;
+		buffer[1] = 0b10010000;								//read from chan1 & modify humidity's variable
+		wiringPiSPIDataRW(SPI_CHAN, buffer, 3);
+		temp = (((buffer[1]&3)<<8)+buffer[2]);
+		
+		buffer[0] = 1;
+		buffer[1] = 0b10100000;								//read from chan1 & modify humidity's variable
+		wiringPiSPIDataRW(SPI_CHAN, buffer, 3);
+		light = (((buffer[1]&3)<<8)+buffer[2]);
+	}
+	
 }
 
 void initGPIO()
@@ -39,25 +74,32 @@ void initGPIO()
 	//set default pin scheme to wiringPi
 	wiringPiSetup();
 	
-	//setup RTC
+	//setup SPI
+	wiringPiSPISetup(SPI_CHAN, SPI_SPEED);
+	//comented out for the moment
+	/*
+	//Setup RTC
 	int rtcSetup;
 	RTC = wiringPiI2CSetup(RTCAddr);
+	
 	syncTime();
-		//setup alarm on RTC for timing
+		//Setup alarm on RTC for timing
 		pinMode(RTCAlarm, INPUT);
 		pullUpDnControl(RTCAlarm, PUD_UP);
 		
-		rtcSetup = ReadReg8(RTC, 0x0D);
-		rtcSetup &= 0b10000111;
-		rtcSetup |= 0b10000000;
+		//Activate Alarm 0 on the RTC
+		rtcSetup = wiringPiI2CReadReg8(RTC, 0x0D);
+		rtcSetup &= 0b00000111;						//TODO check that MFP supposed to go low
+		//rtcSetup |= 0b10000000;
 		wiringPiI2CWriteReg8(RTC, 0x0D, rtcSetup);
-		wiringPiI2CWriteReg8(RTC, 0x0A, 0bxxxxxx1);//no idea if this will work
-		rtcSetup = ReadReg8(RTC, 0x07);
+		
+		//Set RTC to use Alarm with MFP
+		wiringPiI2CWriteReg8(RTC, 0x0A, interval);
+		rtcSetup = wiringPiI2CReadReg8(RTC, 0x07);
 		rtcSetup |= 0b00010000;
-		rtcSetup &= 0b10111111;
+		rtcSetup &= 0b10011111;
 		wiringPiI2CWriteReg8(RTC, 0x07, rtcSetup);
-		//This will probably have a lot of issues
-	
+	*/
 	//setup PWW for alarm
 	pinMode(PWMpin, PWM_OUTPUT);
 	
@@ -73,10 +115,9 @@ void initGPIO()
 	wiringPiISR (BTNS[1], INT_EDGE_FALLING, resetSysTime);
 	wiringPiISR (BTNS[2], INT_EDGE_FALLING, dismissAlarm);
 	wiringPiISR (BTNS[3], INT_EDGE_FALLING, toggleMonitoring);
-	wiringPiISR (RTCAlarm, INT_EDGE_FALLING, //TODO);
+	wiringPiISR (RTCAlarm, INT_EDGE_FALLING, outputValues);
 	
-	//setup SPI
-	wiringPiSPISetup(SPI_CHAN, SPI_SPEED);
+	
 	
 }
 
@@ -127,11 +168,14 @@ void intervalChange()//change update interval between 1s, 2s &5s
 	{
 		switch(interval)
 		{
-			case 1000: interval = 2000;
-			break;
-			case 2000: interval = 5000;
-			break:
-			default: interval = 1000;
+			case 1: interval = 0b0000002;
+				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
+				break;
+			case 2: interval = 0b0000101;
+				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
+				break
+			default: interval = 0b0000001;
+				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
 		}
 	}
 	lastInterruptTime = interruptTime;
@@ -172,4 +216,23 @@ toggleMonitoring()
 		monitoring = ~monitoring;
 	}
 	lastInterruptTime = interruptTime;
+}
+
+
+void outputValues()
+{
+	//Reset alarm flag
+	int reset = wiringPiI2CReadReg8(RTC, 0x0D);	
+	reset &= 0b11110111;					
+	wiringPiI2CWriteReg8(RTC, 0x0D, reset);
+	
+	//Set alarm to trigger after next interval
+	
+	
+	rtcHour = wiringPiI2CReadReg8(RTC, HOUR);
+	rtcMin = wiringPiI2CReadReg8(RTC, MIN);
+	rtcSec = wiringPiI2CReadReg8(RTC, SEC);
+	rtcSec &= 0b01111111;
+	
+	
 }
