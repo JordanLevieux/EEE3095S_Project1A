@@ -10,6 +10,7 @@ int monitoring = 1;					//default true
 
 int sysHour, sysMin, sysSec;		//Time holding variables
 int rtcHour, rtcMin, rtcSec;
+int sHour, sMin, sSec;
 
 float humidity = 0;
 int temp=0;
@@ -23,7 +24,7 @@ int main()
 	
 	setupThread();
     
-	printf("Humidity Temp\tLight\n");
+	printf("RTC Time\tHumidity Temp\tLight\n");
     while (1)
     {
 		if(monitoring)
@@ -96,7 +97,8 @@ void initGPIO()
 	setup |= 0b01000000;
 	setup &= 0b11000000;
 	wiringPiI2CWriteReg8(RTC, 0x07, setup);
-
+	resetSysTime();
+	
 	//setup PWW for alarm
 	pinMode(PWMpin, PWM_OUTPUT);
 	
@@ -114,26 +116,7 @@ void initGPIO()
 	wiringPiISR (BTNS[3], INT_EDGE_FALLING, toggleMonitoring);
 	wiringPiISR (RTCAlarm, INT_EDGE_FALLING, outputValues);
 	
-	
-	
 }
-
-/*void syncTime()//sync the RTC with internet time
-{
-	int HH,MM,SS;
-	HH = getHours();
-	MM = getMins();
-	SS = getSecs();
-
-	HH = decCompensation(HH);
-	wiringPiI2CWriteReg8(RTC, HOUR, HH);
-	
-	MM = decCompensation(MM);
-	wiringPiI2CWriteReg8(RTC, MIN, MM);
-
-	SS = decCompensation(SS);
-	wiringPiI2CWriteReg8(RTC, SEC, 0b10000000+SS);
-}*/
 
 int decCompensation(int units)
 {
@@ -185,16 +168,21 @@ void resetSysTime()
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
 		printf("Reset System Time:\n");
-		sysHour = 0;
-		sysMin = 0;
-		sysSec = 0;
+		sysHour = hexCompensation(wiringPiI2CReadReg8(RTC,HOUR));
+		sysMin = hexCompensation(wiringPiI2CReadReg8(RTC,MIN));
+		sysSec = hexCompensation((wiringPiI2CReadReg8(RTC,SEC)&0b01111111));
 	}
 	lastInterruptTime = interruptTime;
 }
 
-void updateSysTime()
+void getSysTime(int rHour, int rMin, int rSec)
 {
-	//
+	sHour = hexCompensation(rHour)-sysHour;
+	sMin = hexCompensation(rMin)-sysMin;
+	sSec = hexCompensation(rSec)-sysSec;
+	if (sHour<0){sHour+=24;}
+	if (sMin<0){sMin+=60;}
+	if (sSec<0){sSec+=60;}
 }
 
 void dismissAlarm()
@@ -222,15 +210,18 @@ void toggleMonitoring()
 
 void outputValues()
 {
-	printf("Hakuna\n");
 	if(monitoring)
 	{
-		printf("MaTata");
 		if(counter<interval){counter++;}
 		else
 		{
-			counter = 0;
-			printf("%.1f\t%d\t%d\n",humidity, temp, light);
+			counter = 1;
+			rtcHour = wiringPiI2CReadReg8(RTC, HOUR);
+			rtcMin = wiringPiI2CReadReg8(RTC, MIN);
+			rtcSec = wiringPiI2CReadReg8(RTC, SEC);
+			rtcSec &= 0b01111111;
+			getSysTime(rtcHour,rtcMin,rtcSec);
+			printf("%02x:%02x:%02x\t%02d:%02d:%02d\t%.1f\t%d\t%d\n",rtcHour,rtcMin,rtcSec,sHour,sMin,sSec,humidity, temp, light);
 		}
 	}
 }
