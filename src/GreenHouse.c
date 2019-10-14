@@ -1,10 +1,10 @@
-#include <GreenHouse.h>
+#include "GreenHouse.h"
 
 int RTC;
-unsigned char interval = 0b0000001;	//1s default output interval
+//unsigned char interval = 0b0000001;	//1s default output interval
 
 long lastInterruptTime = 0;			//for btn debounce
-int alarm = 0;						//default false
+//int alarm = 0;						//default false
 int monitoring = 1;					//default true
 
 int sysHour, sysMin, sysSec;		//Time holding variables
@@ -36,12 +36,13 @@ void setupThread()
 	//black magic from Keegan to set up thread
 	pthread_attr_t tattr;
     pthread_t thread_id;
-    int newprio = 80;
+    int newprio = 99;
     sched_param param;
+    
     pthread_attr_init (&tattr);
-    pthread_attr_getschedparam (&tattr, &param);
-    param.sched_priority = newprio;
-    pthread_attr_setschedparam (&tattr, &param);
+    pthread_attr_getschedparam (&tattr, &param); /* safe to get existing scheduling param */
+    param.sched_priority = newprio; /* set the priority; others are unchanged */
+    pthread_attr_setschedparam (&tattr, &param); /* setting the new scheduling param */
     pthread_create(&thread_id, &tattr, adcThread, (void *)1);
 }
 
@@ -104,7 +105,7 @@ void initGPIO()
 	pinMode(PWMpin, PWM_OUTPUT);
 	
 	//setup buttons b[0]-Interval change, b[1]-Reset Sys Time, b[2]-Dismiss alarm, b[3]-Toggle monitoring
-	for(int j=0; j < sizeof(BTNS)/sizeof(BTNS[0]); j++)
+	for(uint j=0; j < sizeof(BTNS)/sizeof(BTNS[0]); j++)
 	{
 		pinMode(BTNS[j], INPUT);
 		pullUpDnControl(BTNS[j], PUD_UP);
@@ -121,7 +122,7 @@ void initGPIO()
 	
 }
 
-void syncTime()//sync the RTC with internet time
+/*void syncTime()//sync the RTC with internet time
 {
 	int HH,MM,SS;
 	HH = getHours();
@@ -136,7 +137,7 @@ void syncTime()//sync the RTC with internet time
 
 	SS = decCompensation(SS);
 	wiringPiI2CWriteReg8(RTC, SEC, 0b10000000+SS);
-}
+}*/
 
 int decCompensation(int units)
 {
@@ -161,14 +162,14 @@ int hexCompensation(int units)
 }
 
 void intervalChange()//change update interval between 1s, 2s &5s
-{
+{/*
 	long interruptTime = millis();
 
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
 		switch(interval)
 		{
-			case 1: interval = 0b0000002;
+			case 1: interval = 0b0000010;
 				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
 				break;
 			case 2: interval = 0b0000101;
@@ -178,7 +179,7 @@ void intervalChange()//change update interval between 1s, 2s &5s
 				wiringPiI2CWriteReg8(RTC, 0x0A, interval);
 		}
 	}
-	lastInterruptTime = interruptTime;
+	lastInterruptTime = interruptTime;*/
 }
 
 void resetSysTime()
@@ -200,15 +201,15 @@ void updateSysTime()
 
 void dismissAlarm()
 {
-	long interruptTime = millis();
+	/*long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
 	{
 		alarm = 0;
 	}
-	lastInterruptTime = interruptTime;
+	lastInterruptTime = interruptTime;*/
 }
 
-toggleMonitoring()
+void toggleMonitoring()
 {
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>debounceTime)
