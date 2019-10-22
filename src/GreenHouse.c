@@ -1,3 +1,4 @@
+
 #include "GreenHouse.h"
 
 int RTC;
@@ -21,11 +22,11 @@ int main()
 {
 	initGPIO();
 	
-	resetSysTime();
+	setSysTime();
 	
 	setupThread();
     
-	printf("RTC Time\tSys Time\tHumidity Temp\tLight\tDAC out\n");
+	printf("RTC Time\tSys Time\tHumidity Temp\tLight\tDACout\tAlarm\n");
     while (1)
     {
 		if(monitoring)
@@ -177,6 +178,17 @@ void resetSysTime()
 		sysSec = hexCompensation((wiringPiI2CReadReg8(RTC,SEC)&0b01111111));
 	}
 	lastInterruptTime = interruptTime;
+}
+
+void setSysTime()
+{
+   
+        printf("Reset System Time:\n");
+        sysHour = hexCompensation(wiringPiI2CReadReg8(RTC,HOUR));
+        sysMin = hexCompensation(wiringPiI2CReadReg8(RTC,MIN));
+        sysSec = hexCompensation((wiringPiI2CReadReg8(RTC,SEC)&0b01111111));
+   
+   
 }
 
 void getSysTime(int rHour, int rMin, int rSec)

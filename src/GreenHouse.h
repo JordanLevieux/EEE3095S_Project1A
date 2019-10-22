@@ -23,6 +23,7 @@ void setupThread();
 void *adcThread(void *threadargs);
 void outputValues();
 void triggerAlarm();
+void setSysTime();
 
 //Constants
 const char RTCAddr = 0x6f;
